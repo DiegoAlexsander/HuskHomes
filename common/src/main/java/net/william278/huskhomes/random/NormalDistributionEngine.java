@@ -32,6 +32,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 /**
@@ -150,28 +151,35 @@ public final class NormalDistributionEngine extends RandomTeleportEngine {
     }
 
     private boolean passesRegionChecks(@NotNull Location location) {
-        return plugin.getHooks().stream()
-                .filter(h -> h instanceof RegionCheckHook)
-                .map(h -> (RegionCheckHook) h)
-                .allMatch(h -> h.isLocationAllowed(location));
+        try {
+            return plugin.supplySync(() -> plugin.getHooks().stream()
+                    .filter(h -> h instanceof RegionCheckHook)
+                    .map(h -> (RegionCheckHook) h)
+                    .allMatch(h -> {
+                        try {
+                            return h.isLocationAllowed(location);
+                        } catch (Exception e) {
+                            plugin.log(Level.WARNING, "Region check error (" + h.getClass().getSimpleName() + "): " + e.getMessage());
+                            return true;
+                        }
+                    })
+            ).get(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            plugin.log(Level.WARNING, "Region checks timed out or failed, allowing position: " + e.getMessage());
+            return true;
+        }
     }
 
     @Override
     public CompletableFuture<Optional<Position>> getRandomPosition(@NotNull World world, @NotNull String[] args) {
         return plugin.supplyAsync(() -> {
-            Optional<Location> location = generateSafeLocation(world).join();
-            int attempts = 0;
-            while (location.isEmpty() || (location.isPresent() && !passesRegionChecks(location.get()))) {
-                if (location.isPresent()) {
-                    location = Optional.empty();
+            for (int attempts = 0; attempts < maxAttempts; attempts++) {
+                final Optional<Location> location = generateSafeLocation(world).join();
+                if (location.isPresent() && passesRegionChecks(location.get())) {
+                    return location.map(resolved -> Position.at(resolved, plugin.getServerName()));
                 }
-                location = generateSafeLocation(world).join();
-                if (attempts >= maxAttempts) {
-                    return Optional.empty();
-                }
-                attempts++;
             }
-            return location.map(resolved -> Position.at(resolved, plugin.getServerName()));
+            return Optional.empty();
         });
     }
 
@@ -179,19 +187,13 @@ public final class NormalDistributionEngine extends RandomTeleportEngine {
     public CompletableFuture<Optional<Position>> getRandomPosition(@NotNull World world,
                                                                    @NotNull Payload.RtpLocationParams params) {
         return plugin.supplyAsync(() -> {
-            Optional<Location> location = generateSafeLocation(world, params).join();
-            int attempts = 0;
-            while (location.isEmpty() || (location.isPresent() && !passesRegionChecks(location.get()))) {
-                if (location.isPresent()) {
-                    location = Optional.empty();
+            for (int attempts = 0; attempts < maxAttempts; attempts++) {
+                final Optional<Location> location = generateSafeLocation(world, params).join();
+                if (location.isPresent() && passesRegionChecks(location.get())) {
+                    return location.map(resolved -> Position.at(resolved, plugin.getServerName()));
                 }
-                location = generateSafeLocation(world, params).join();
-                if (attempts >= maxAttempts) {
-                    return Optional.empty();
-                }
-                attempts++;
             }
-            return location.map(resolved -> Position.at(resolved, plugin.getServerName()));
+            return Optional.empty();
         });
     }
 }

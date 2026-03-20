@@ -138,6 +138,18 @@ public interface Task extends Runnable {
             return future;
         }
 
+        default <T> CompletableFuture<T> supplySync(@NotNull java.util.function.Supplier<T> supplier) {
+            final CompletableFuture<T> future = new CompletableFuture<>();
+            runSync(() -> {
+                try {
+                    future.complete(supplier.get());
+                } catch (Throwable throwable) {
+                    future.completeExceptionally(throwable);
+                }
+            });
+            return future;
+        }
+
         void cancelTasks();
 
         @NotNull

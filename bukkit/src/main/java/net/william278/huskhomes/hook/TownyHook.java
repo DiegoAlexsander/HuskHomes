@@ -47,6 +47,11 @@ public class TownyHook extends Hook implements RegionCheckHook {
         if (bukkitLoc == null || bukkitLoc.getWorld() == null) {
             return true;
         }
-        return TownyAPI.getInstance().isWilderness(bukkitLoc);
+        try {
+            return TownyAPI.getInstance().isWilderness(bukkitLoc);
+        } catch (Exception e) {
+            plugin.log(java.util.logging.Level.WARNING, "Towny region check failed: " + e.getMessage());
+            return true;
+        }
     }
 }

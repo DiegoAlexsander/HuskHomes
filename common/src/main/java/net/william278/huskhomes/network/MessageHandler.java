@@ -158,6 +158,7 @@ public interface MessageHandler {
     }
 
     default void handleRtpLocation(@NotNull Message message, @NotNull OnlineUser receiver) {
+        getPlugin().getPendingCrossServerRtp().remove(receiver.getUuid());
         final Optional<Position> position = message.getPayload().getPosition();
         if (position.isEmpty()) {
             getPlugin().getLocales().getLocale("error_rtp_randomization_timeout")

@@ -51,10 +51,14 @@ public class WorldGuardHook extends Hook implements RegionCheckHook {
         if (bukkitLoc == null || bukkitLoc.getWorld() == null) {
             return true;
         }
-
-        final RegionContainer container = WorldGuard.getInstance().getPlatform().getRegionContainer();
-        final RegionQuery query = container.createQuery();
-        final ApplicableRegionSet set = query.getApplicableRegions(BukkitAdapter.adapt(bukkitLoc));
-        return set.size() == 0;
+        try {
+            final RegionContainer container = WorldGuard.getInstance().getPlatform().getRegionContainer();
+            final RegionQuery query = container.createQuery();
+            final ApplicableRegionSet set = query.getApplicableRegions(BukkitAdapter.adapt(bukkitLoc));
+            return set.size() == 0;
+        } catch (Exception e) {
+            plugin.log(java.util.logging.Level.WARNING, "WorldGuard region check failed: " + e.getMessage());
+            return true;
+        }
     }
 }

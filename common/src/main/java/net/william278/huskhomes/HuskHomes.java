@@ -237,6 +237,13 @@ public interface HuskHomes extends Task.Supplier, EventDispatcher, SavePositionP
     Set<UUID> getWarmupDamagedUsers();
 
     /**
+     * Returns a set of player UUIDs currently waiting for a cross-server RTP response.
+     * Used to implement a timeout for cross-server RTP requests.
+     */
+    @NotNull
+    Set<UUID> getPendingCrossServerRtp();
+
+    /**
      * Returns if the given user is currently warming up to teleport to a home.
      *
      * @param userUuid The user to check.

@@ -222,6 +222,14 @@ public class RtpCommand extends Command implements UserListTabCompletable {
                             useMean, useStdDev
                     ))
                     .build().send(b, teleporter));
+            plugin.getPendingCrossServerRtp().add(teleporter.getUuid());
+            final UUID pendingUuid = teleporter.getUuid();
+            plugin.runAsyncDelayed(() -> {
+                if (plugin.getPendingCrossServerRtp().remove(pendingUuid)) {
+                    plugin.getLocales().getLocale("error_rtp_randomization_timeout")
+                            .ifPresent(teleporter::sendMessage);
+                }
+            }, 300L);
             return;
         }
 
@@ -476,6 +484,14 @@ public class RtpCommand extends Command implements UserListTabCompletable {
                     .target(targetServer, Message.TargetType.SERVER)
                     .payload(Payload.string(world.getName()))
                     .build().send(b, teleporter));
+            plugin.getPendingCrossServerRtp().add(teleporter.getUuid());
+            final UUID pendingUuid = teleporter.getUuid();
+            plugin.runAsyncDelayed(() -> {
+                if (plugin.getPendingCrossServerRtp().remove(pendingUuid)) {
+                    plugin.getLocales().getLocale("error_rtp_randomization_timeout")
+                            .ifPresent(teleporter::sendMessage);
+                }
+            }, 300L);
             return;
         }
 

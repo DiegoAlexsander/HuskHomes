@@ -33,6 +33,7 @@ import net.william278.huskhomes.api.HuskHomesAPI;
 import net.william278.huskhomes.command.BukkitCommand;
 import net.william278.huskhomes.command.Command;
 import net.william278.huskhomes.config.Locales;
+import net.william278.huskhomes.config.RtpLocations;
 import net.william278.huskhomes.config.Server;
 import net.william278.huskhomes.config.Settings;
 import net.william278.huskhomes.config.Spawn;
@@ -113,6 +114,8 @@ public class BukkitHuskHomes extends JavaPlugin implements HuskHomes, BukkitTask
     private Spawn serverSpawn;
     @Setter
     private UnsafeBlocks unsafeBlocks;
+    @Setter
+    private RtpLocations rtpLocations;
     @Setter
     @Nullable
     private Broker broker;

@@ -20,6 +20,7 @@
 package net.william278.huskhomes.random;
 
 import net.william278.huskhomes.HuskHomes;
+import net.william278.huskhomes.network.Payload;
 import net.william278.huskhomes.position.Position;
 import net.william278.huskhomes.position.World;
 import org.jetbrains.annotations.NotNull;
@@ -84,5 +85,18 @@ public abstract class RandomTeleportEngine {
      */
     public abstract CompletableFuture<Optional<Position>> getRandomPosition(@NotNull World world,
                                                                             @NotNull String[] args);
+
+    /**
+     * Gets a random position in the {@link World} using custom location parameters from an RTP location,
+     * or {@link Optional#empty()} if no position could be found in the configured number of attempts.
+     *
+     * @param world  The world to find a random position in
+     * @param params The location parameters to use (center, radius, distribution)
+     * @return An Optional position, if one could be found in the {@link #maxAttempts max attempts}
+     */
+    public CompletableFuture<Optional<Position>> getRandomPosition(@NotNull World world,
+                                                                   @NotNull Payload.RtpLocationParams params) {
+        return getRandomPosition(world, new String[0]);
+    }
 
 }

@@ -381,6 +381,19 @@ public final class Settings {
         private Map<String, List<String>> randomTargetServers = new HashMap<>(
                 Map.of("server", List.of("world", "world_nether", "world_the_end"))
         );
+
+        @Comment("Region protection checks during RTP (requires the respective plugins to be installed)")
+        private RegionChecks regionChecks = new RegionChecks();
+
+        @Getter
+        @Configuration
+        @NoArgsConstructor
+        public static class RegionChecks {
+            @Comment("Avoid Towny claimed areas when generating random positions")
+            private boolean towny = false;
+            @Comment("Avoid WorldGuard protected regions when generating random positions")
+            private boolean worldGuard = false;
+        }
     }
 
     @Comment("Action cooldown settings. Docs: https://william278.net/docs/huskhomes/cooldowns")

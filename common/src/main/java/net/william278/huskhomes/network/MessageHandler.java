@@ -124,18 +124,37 @@ public interface MessageHandler {
     }
 
     default void handleRtpRequestLocation(@NotNull Message message) {
-        final Optional<World> requested = message.getPayload().getString().flatMap(
-                name -> getPlugin().getWorlds().stream().filter(w -> w.getName().equalsIgnoreCase(name)).findFirst());
-        requested.map(world -> getPlugin().getRandomTeleportEngine().getRandomPosition(world, new String[0]))
-                .orElse(CompletableFuture.completedFuture(Optional.empty()))
-                .thenAccept(
-                        (teleport) -> Message.builder()
-                                .type(Message.MessageType.RTP_LOCATION)
-                                .target(message.getSender(), Message.TargetType.PLAYER)
-                                .payload(Payload.position(teleport.orElse(null)))
-                                .build().send(getBroker(), null)
-                );
+        final Optional<Payload.RtpLocationParams> locationParams = message.getPayload().getRtpLocationParams();
 
+        if (locationParams.isPresent()) {
+            // Location-based RTP with custom parameters
+            final Payload.RtpLocationParams params = locationParams.get();
+            final Optional<World> world = getPlugin().getWorlds().stream()
+                    .filter(w -> w.getName().equalsIgnoreCase(params.getWorld()))
+                    .findFirst();
+            world.map(w -> getPlugin().getRandomTeleportEngine().getRandomPosition(w, params))
+                    .orElse(CompletableFuture.completedFuture(Optional.empty()))
+                    .thenAccept(
+                            (teleport) -> Message.builder()
+                                    .type(Message.MessageType.RTP_LOCATION)
+                                    .target(message.getSender(), Message.TargetType.PLAYER)
+                                    .payload(Payload.position(teleport.orElse(null)))
+                                    .build().send(getBroker(), null)
+                    );
+        } else {
+            // Standard RTP (backwards compatible)
+            final Optional<World> requested = message.getPayload().getString().flatMap(
+                    name -> getPlugin().getWorlds().stream().filter(w -> w.getName().equalsIgnoreCase(name)).findFirst());
+            requested.map(world -> getPlugin().getRandomTeleportEngine().getRandomPosition(world, new String[0]))
+                    .orElse(CompletableFuture.completedFuture(Optional.empty()))
+                    .thenAccept(
+                            (teleport) -> Message.builder()
+                                    .type(Message.MessageType.RTP_LOCATION)
+                                    .target(message.getSender(), Message.TargetType.PLAYER)
+                                    .payload(Payload.position(teleport.orElse(null)))
+                                    .build().send(getBroker(), null)
+                    );
+        }
     }
 
     default void handleRtpLocation(@NotNull Message message, @NotNull OnlineUser receiver) {

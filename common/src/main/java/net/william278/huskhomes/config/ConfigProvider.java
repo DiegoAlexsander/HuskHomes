@@ -47,6 +47,7 @@ public interface ConfigProvider {
         loadServer();
         loadServerSpawn();
         loadUnsafeBlocks();
+        loadRtpLocations();
     }
 
     /**
@@ -224,6 +225,42 @@ public interface ConfigProvider {
      * @return the resource, if found
      */
     InputStream getResource(@NotNull String name);
+
+    /**
+     * Get the RTP locations config.
+     *
+     * @return the RTP locations config
+     */
+    @NotNull
+    RtpLocations getRtpLocations();
+
+    /**
+     * Set the RTP locations config.
+     *
+     * @param rtpLocations The RTP locations config to set
+     */
+    void setRtpLocations(@NotNull RtpLocations rtpLocations);
+
+    /**
+     * Load the RTP locations config from rtp-locations.yml.
+     */
+    default void loadRtpLocations() {
+        final Path path = getConfigDirectory().resolve("rtp-locations.yml");
+        if (Files.exists(path)) {
+            setRtpLocations(YamlConfigurations.update(
+                    path,
+                    RtpLocations.class,
+                    YAML_CONFIGURATION_PROPERTIES.header(RtpLocations.CONFIG_HEADER).build()
+            ));
+        } else {
+            setRtpLocations(YamlConfigurations.update(
+                    path,
+                    RtpLocations.class,
+                    YAML_CONFIGURATION_PROPERTIES.header(RtpLocations.CONFIG_HEADER).build()
+            ));
+        }
+        getPlugin().log(Level.INFO, "Loaded %d RTP location(s)".formatted(getRtpLocations().getLocationNames().size()));
+    }
 
     /**
      * Get the plugin config directory.

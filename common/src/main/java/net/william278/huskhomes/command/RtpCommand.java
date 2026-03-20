@@ -24,6 +24,7 @@ import net.william278.huskhomes.network.Broker;
 import net.william278.huskhomes.network.Message;
 import net.william278.huskhomes.network.Payload;
 import net.william278.huskhomes.position.World;
+import net.william278.huskhomes.random.RtpLocation;
 import net.william278.huskhomes.teleport.Teleport;
 import net.william278.huskhomes.teleport.TeleportBuilder;
 import net.william278.huskhomes.user.CommandUser;
@@ -41,17 +42,24 @@ public class RtpCommand extends Command implements UserListTabCompletable {
     protected RtpCommand(@NotNull HuskHomes plugin) {
         super(
                 List.of("rtp"),
-                "[player] [<world> [server]|<world>]",
+                "[player] [<world> [server]|<world>|location <name>]",
                 plugin
         );
 
         addAdditionalPermissions(Map.of(
-                "other", true
+                "other", true,
+                "location", true
         ));
     }
 
     @Override
     public void execute(@NotNull CommandUser executor, @NotNull String[] args) {
+        // Check for "location" subcommand: /rtp location <name> [player]
+        if (args.length >= 1 && args[0].equalsIgnoreCase("location")) {
+            executeLocationRtp(executor, args);
+            return;
+        }
+
         final Optional<OnlineUser> optionalTeleporter = args.length >= 1 ? plugin.getOnlineUser(args[0])
                 : executor instanceof OnlineUser ? Optional.of((OnlineUser) executor) : Optional.empty();
         if (optionalTeleporter.isEmpty()) {
@@ -61,12 +69,19 @@ public class RtpCommand extends Command implements UserListTabCompletable {
                 return;
             }
 
+            // Could also be "location" keyword with missing name
             plugin.getLocales().getLocale("error_player_not_found", args[0])
                     .ifPresent(executor::sendMessage);
             return;
         }
 
         final OnlineUser teleporter = optionalTeleporter.get();
+
+        // Check if the second arg is "location": /rtp <player> location <name>
+        if (args.length >= 2 && args[1].equalsIgnoreCase("location")) {
+            executeLocationRtpForPlayer(teleporter, executor, args);
+            return;
+        }
 
         // Determine the target world and server based on the command arguments
         String worldName = teleporter.getPosition().getWorld().getName();
@@ -91,19 +106,210 @@ public class RtpCommand extends Command implements UserListTabCompletable {
                 .ifPresent(entry -> executeRtp(teleporter, executor, entry.getKey(), entry.getValue(), args));
     }
 
+    /**
+     * Handles /rtp location &lt;name&gt; [player]
+     */
+    private void executeLocationRtp(@NotNull CommandUser executor, @NotNull String[] args) {
+        if (args.length < 2) {
+            plugin.getLocales().getLocale("error_invalid_syntax", "/rtp location <name> [player]")
+                    .ifPresent(executor::sendMessage);
+            return;
+        }
+
+        // Check permission
+        if (!executor.hasPermission(getPermission("location"))) {
+            plugin.getLocales().getLocale("error_no_permission")
+                    .ifPresent(executor::sendMessage);
+            return;
+        }
+
+        final String locationName = args[1];
+
+        // Determine the teleporter
+        final OnlineUser teleporter;
+        if (args.length >= 3) {
+            final Optional<OnlineUser> optionalTarget = plugin.getOnlineUser(args[2]);
+            if (optionalTarget.isEmpty()) {
+                plugin.getLocales().getLocale("error_player_not_found", args[2])
+                        .ifPresent(executor::sendMessage);
+                return;
+            }
+            if (!executor.hasPermission(getPermission("other"))) {
+                plugin.getLocales().getLocale("error_no_permission")
+                        .ifPresent(executor::sendMessage);
+                return;
+            }
+            teleporter = optionalTarget.get();
+        } else {
+            if (!(executor instanceof OnlineUser)) {
+                plugin.getLocales().getLocale("error_in_game_only")
+                        .ifPresent(executor::sendMessage);
+                return;
+            }
+            teleporter = (OnlineUser) executor;
+        }
+
+        performLocationRtp(teleporter, executor, locationName);
+    }
+
+    /**
+     * Handles /rtp &lt;player&gt; location &lt;name&gt;
+     */
+    private void executeLocationRtpForPlayer(@NotNull OnlineUser teleporter, @NotNull CommandUser executor,
+                                             @NotNull String[] args) {
+        if (args.length < 3) {
+            plugin.getLocales().getLocale("error_invalid_syntax", "/rtp <player> location <name>")
+                    .ifPresent(executor::sendMessage);
+            return;
+        }
+
+        if (!executor.hasPermission(getPermission("location"))) {
+            plugin.getLocales().getLocale("error_no_permission")
+                    .ifPresent(executor::sendMessage);
+            return;
+        }
+
+        if (!executor.equals(teleporter) && !executor.hasPermission(getPermission("other"))) {
+            plugin.getLocales().getLocale("error_no_permission")
+                    .ifPresent(executor::sendMessage);
+            return;
+        }
+
+        performLocationRtp(teleporter, executor, args[2]);
+    }
+
+    /**
+     * Performs an RTP using a named location.
+     */
+    private void performLocationRtp(@NotNull OnlineUser teleporter, @NotNull CommandUser executor,
+                                    @NotNull String locationName) {
+        final Optional<RtpLocation> optionalLocation = plugin.getRtpLocations().getLocation(locationName);
+        if (optionalLocation.isEmpty()) {
+            plugin.getLocales().getLocale("error_rtp_location_not_found", locationName)
+                    .ifPresent(executor::sendMessage);
+            return;
+        }
+
+        // Check economy
+        if (!plugin.validateTransaction(teleporter, TransactionResolver.Action.RANDOM_TELEPORT)) {
+            return;
+        }
+
+        final RtpLocation location = optionalLocation.get();
+        final float useMean = location.getDistributionMean() > 0
+                ? location.getDistributionMean() : plugin.getSettings().getRtp().getDistributionMean();
+        final float useStdDev = location.getDistributionStandardDeviation() > 0
+                ? location.getDistributionStandardDeviation()
+                : plugin.getSettings().getRtp().getDistributionStandardDeviation();
+
+        // Check if location is on a different server (cross-server)
+        final String locationServer = location.getServer();
+        final boolean isCrossServer = !locationServer.isEmpty()
+                && !locationServer.equalsIgnoreCase(plugin.getServerName());
+
+        if (isCrossServer && plugin.getSettings().getCrossServer().isEnabled()
+            && plugin.getSettings().getCrossServer().getBrokerType() == Broker.Type.REDIS) {
+            plugin.getLocales().getLocale("teleporting_random_location", locationName)
+                    .ifPresent(teleporter::sendMessage);
+
+            plugin.getBroker().ifPresent(b -> Message.builder()
+                    .type(Message.MessageType.REQUEST_RTP_LOCATION)
+                    .target(locationServer, Message.TargetType.SERVER)
+                    .payload(Payload.rtpLocationRequest(
+                            location.getWorld(),
+                            location.getCenterX(), location.getCenterZ(),
+                            location.getMinRadius(), location.getMaxRadius(),
+                            useMean, useStdDev
+                    ))
+                    .build().send(b, teleporter));
+            return;
+        }
+
+        // Local location RTP
+        final Optional<World> localWorld = plugin.getWorlds().stream()
+                .filter(w -> w.getName().replace("minecraft:", "")
+                        .equalsIgnoreCase(location.getWorld().replace("minecraft:", "")))
+                .findFirst();
+
+        if (localWorld.isEmpty()) {
+            plugin.getLocales().getLocale("error_invalid_world", location.getWorld())
+                    .ifPresent(executor::sendMessage);
+            return;
+        }
+
+        plugin.getLocales().getLocale("teleporting_random_location", locationName)
+                .ifPresent(teleporter::sendMessage);
+
+        final Payload.RtpLocationParams params = new Payload.RtpLocationParams(
+                location.getWorld(),
+                location.getCenterX(), location.getCenterZ(),
+                location.getMinRadius(), location.getMaxRadius(),
+                useMean, useStdDev
+        );
+
+        plugin.getRandomTeleportEngine()
+                .getRandomPosition(localWorld.get(), params)
+                .thenAccept(position -> {
+                    if (position.isEmpty()) {
+                        plugin.getLocales().getLocale("error_rtp_randomization_timeout")
+                                .ifPresent(executor::sendMessage);
+                        return;
+                    }
+
+                    final TeleportBuilder builder = Teleport.builder(plugin)
+                            .teleporter(teleporter)
+                            .type(Teleport.Type.RANDOM_TELEPORT)
+                            .actions(TransactionResolver.Action.RANDOM_TELEPORT)
+                            .target(position.get());
+                    builder.buildAndComplete(executor.equals(teleporter));
+                });
+    }
+
     @Nullable
     @Override
     public List<String> suggest(@NotNull CommandUser user, @NotNull String[] args) {
         return switch (args.length) {
-            case 0, 1 -> user.hasPermission(getPermission("other"))
-                    ? UserListTabCompletable.super.suggest(user, args)
-                    : user instanceof OnlineUser online ? List.of(online.getName()) : List.of();
+            case 0, 1 -> {
+                List<String> suggestions = new ArrayList<>();
+                // Suggest "location" keyword
+                if (user.hasPermission(getPermission("location"))) {
+                    suggestions.add("location");
+                }
+                // Suggest players
+                if (user.hasPermission(getPermission("other"))) {
+                    List<String> playerSuggestions = UserListTabCompletable.super.suggest(user, args);
+                    if (playerSuggestions != null) {
+                        suggestions.addAll(playerSuggestions);
+                    }
+                } else if (user instanceof OnlineUser online) {
+                    suggestions.add(online.getName());
+                }
+                if (args.length == 1 && !args[0].isEmpty()) {
+                    yield suggestions.stream()
+                            .filter(s -> s.toLowerCase().startsWith(args[0].toLowerCase()))
+                            .toList();
+                }
+                yield suggestions;
+            }
 
             case 2 -> {
+                // If first arg is "location", suggest location names
+                if (args[0].equalsIgnoreCase("location")) {
+                    final String input = args[1].toLowerCase();
+                    yield plugin.getRtpLocations().getLocationNames().stream()
+                            .filter(name -> input.isEmpty() || name.toLowerCase().startsWith(input))
+                            .toList();
+                }
+
                 String input = args[1].toLowerCase();
 
                 // Check if the input could be a world or a server name
                 List<String> possibleSuggestions = new ArrayList<>();
+
+                // Suggest "location" keyword
+                if (user.hasPermission(getPermission("location"))) {
+                    possibleSuggestions.add("location");
+                }
 
                 // Suggest available servers if user has permission
                 possibleSuggestions.addAll(plugin.getSettings().getRtp().getRandomTargetServers().keySet().stream()
@@ -126,6 +332,14 @@ public class RtpCommand extends Command implements UserListTabCompletable {
                 yield possibleSuggestions;
             }
             case 3 -> {
+                // If second arg is "location", suggest location names
+                if (args[1].equalsIgnoreCase("location")) {
+                    final String input = args[2].toLowerCase();
+                    yield plugin.getRtpLocations().getLocationNames().stream()
+                            .filter(name -> input.isEmpty() || name.toLowerCase().startsWith(input))
+                            .toList();
+                }
+
                 // If worldName is a world, suggest servers that contain the world
                 String worldName = args[1];
 

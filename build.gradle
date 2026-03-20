@@ -24,6 +24,7 @@ ext {
     set 'mysql_driver_version', mysql_driver_version.toString()
     set 'mariadb_driver_version', mariadb_driver_version.toString()
     set 'postgresql_driver_version', postgresql_driver_version.toString()
+    set 'h2_driver_version', h2_driver_version.toString()
 }
 
 publishing {
@@ -88,6 +89,8 @@ allprojects {
         maven { url 'https://repo.essentialsx.net/releases/' }
         maven { url 'https://repo.mikeprimm.com/' }
         maven { url 'https://maven.impactdev.net/repository/development' }
+        maven { url 'https://repo.glaremasters.me/repository/towny/' }
+        maven { url 'https://maven.enginehub.org/repo/' }
         maven { url 'https://jitpack.io' }
     }
 

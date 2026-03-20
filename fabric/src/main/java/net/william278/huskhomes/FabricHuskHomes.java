@@ -52,6 +52,7 @@ import net.william278.huskhomes.api.FabricHuskHomesAPI;
 import net.william278.huskhomes.command.Command;
 import net.william278.huskhomes.command.FabricCommand;
 import net.william278.huskhomes.config.Locales;
+import net.william278.huskhomes.config.RtpLocations;
 import net.william278.huskhomes.config.Server;
 import net.william278.huskhomes.config.Settings;
 import net.william278.huskhomes.config.Spawn;
@@ -132,6 +133,8 @@ public class FabricHuskHomes implements DedicatedServerModInitializer, HuskHomes
     private Spawn serverSpawn;
     @Setter
     private UnsafeBlocks unsafeBlocks;
+    @Setter
+    private RtpLocations rtpLocations;
     @Setter
     @Nullable
     private Broker broker;

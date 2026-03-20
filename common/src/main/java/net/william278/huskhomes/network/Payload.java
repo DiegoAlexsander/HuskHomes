@@ -22,6 +22,7 @@ package net.william278.huskhomes.network;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.william278.huskhomes.position.Position;
 import net.william278.huskhomes.position.World;
@@ -55,6 +56,10 @@ public class Payload {
     @Expose
     @SerializedName("user_list")
     private List<User> userList;
+    @Nullable
+    @Expose
+    @SerializedName("rtp_location_params")
+    private RtpLocationParams rtpLocationParams;
 
     @NotNull
     public static Payload empty() {
@@ -96,6 +101,17 @@ public class Payload {
         return payload;
     }
 
+    @NotNull
+    public static Payload rtpLocationRequest(@NotNull String worldName, double centerX, double centerZ,
+                                             int minRadius, int maxRadius, float mean, float stdDev) {
+        final Payload payload = new Payload();
+        payload.string = worldName;
+        payload.rtpLocationParams = new RtpLocationParams(
+                worldName, centerX, centerZ, minRadius, maxRadius, mean, stdDev
+        );
+        return payload;
+    }
+
     public Optional<String> getString() {
         return Optional.ofNullable(string);
     }
@@ -114,6 +130,52 @@ public class Payload {
 
     public Optional<List<User>> getUserList() {
         return Optional.ofNullable(userList);
+    }
+
+    public Optional<RtpLocationParams> getRtpLocationParams() {
+        return Optional.ofNullable(rtpLocationParams);
+    }
+
+    /**
+     * Parameters for a named RTP location, sent cross-server so the target server
+     * can generate a random position using the location's specific center, radius,
+     * and distribution settings.
+     */
+    @Getter
+    @NoArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class RtpLocationParams {
+        @Expose
+        private String world;
+        @Expose
+        @SerializedName("center_x")
+        private double centerX;
+        @Expose
+        @SerializedName("center_z")
+        private double centerZ;
+        @Expose
+        @SerializedName("min_radius")
+        private int minRadius;
+        @Expose
+        @SerializedName("max_radius")
+        private int maxRadius;
+        @Expose
+        @SerializedName("distribution_mean")
+        private float distributionMean;
+        @Expose
+        @SerializedName("distribution_standard_deviation")
+        private float distributionStandardDeviation;
+
+        public RtpLocationParams(@NotNull String world, double centerX, double centerZ,
+                                 int minRadius, int maxRadius, float distributionMean,
+                                 float distributionStandardDeviation) {
+            this.world = world;
+            this.centerX = centerX;
+            this.centerZ = centerZ;
+            this.minRadius = minRadius;
+            this.maxRadius = maxRadius;
+            this.distributionMean = distributionMean;
+            this.distributionStandardDeviation = distributionStandardDeviation;
+        }
     }
 
 }

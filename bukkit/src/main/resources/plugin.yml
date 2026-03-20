@@ -14,6 +14,8 @@ softdepend:
   - Pl3xMap
   - Plan
   - Essentials
+  - Towny
+  - WorldGuard
 libraries:
   - 'redis.clients:jedis:${jedis_version}'
   - 'com.mysql:mysql-connector-j:${mysql_driver_version}'

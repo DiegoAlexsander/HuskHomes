@@ -47,6 +47,14 @@ public interface BukkitHookProvider extends HookProvider {
             hooks.add(new EssentialsXImporter(getPlugin()));
         }
 
+        // Region check hooks for RTP
+        if (isDependencyAvailable("Towny") && settings.getRtp().getRegionChecks().isTowny()) {
+            hooks.add(new TownyHook(getPlugin()));
+        }
+        if (isDependencyAvailable("WorldGuard") && settings.getRtp().getRegionChecks().isWorldGuard()) {
+            hooks.add(new WorldGuardHook(getPlugin()));
+        }
+
         return hooks;
     }
 

@@ -21,7 +21,9 @@ package net.william278.huskhomes.random;
 
 import net.william278.huskhomes.HuskHomes;
 import net.william278.huskhomes.config.Settings;
+import net.william278.huskhomes.hook.RegionCheckHook;
 import net.william278.huskhomes.network.Broker;
+import net.william278.huskhomes.network.Payload;
 import net.william278.huskhomes.position.Location;
 import net.william278.huskhomes.position.Position;
 import net.william278.huskhomes.position.World;
@@ -106,6 +108,24 @@ public final class NormalDistributionEngine extends RandomTeleportEngine {
     }
 
     /**
+     * Generate a safe ground-level {@link Location} using custom center and radius parameters from an RTP location.
+     *
+     * @param world  The world to generate the location in
+     * @param params The location parameters
+     * @return A generated safe location
+     */
+    private CompletableFuture<Optional<Location>> generateSafeLocation(@NotNull World world,
+                                                                       @NotNull Payload.RtpLocationParams params) {
+        final float useMean = params.getDistributionMean() > 0 ? params.getDistributionMean() : mean;
+        final float useStdDev = params.getDistributionStandardDeviation() > 0
+                ? params.getDistributionStandardDeviation() : standardDeviation;
+        final Location center = Location.at(params.getCenterX(), 128d, params.getCenterZ(), world);
+        return plugin.findSafeGroundLocation(generateLocation(
+                center, useMean, useStdDev, params.getMinRadius(), params.getMaxRadius()
+        ));
+    }
+
+    /**
      * Generates a normally distributed radius between the spawnRadius and the maximum radius value,
      * using the provided standard deviation and mean.
      *
@@ -129,13 +149,43 @@ public final class NormalDistributionEngine extends RandomTeleportEngine {
         return (float) (Math.random() * 360);
     }
 
+    private boolean passesRegionChecks(@NotNull Location location) {
+        return plugin.getHooks().stream()
+                .filter(h -> h instanceof RegionCheckHook)
+                .map(h -> (RegionCheckHook) h)
+                .allMatch(h -> h.isLocationAllowed(location));
+    }
+
     @Override
     public CompletableFuture<Optional<Position>> getRandomPosition(@NotNull World world, @NotNull String[] args) {
         return plugin.supplyAsync(() -> {
             Optional<Location> location = generateSafeLocation(world).join();
             int attempts = 0;
-            while (location.isEmpty()) {
+            while (location.isEmpty() || (location.isPresent() && !passesRegionChecks(location.get()))) {
+                if (location.isPresent()) {
+                    location = Optional.empty();
+                }
                 location = generateSafeLocation(world).join();
+                if (attempts >= maxAttempts) {
+                    return Optional.empty();
+                }
+                attempts++;
+            }
+            return location.map(resolved -> Position.at(resolved, plugin.getServerName()));
+        });
+    }
+
+    @Override
+    public CompletableFuture<Optional<Position>> getRandomPosition(@NotNull World world,
+                                                                   @NotNull Payload.RtpLocationParams params) {
+        return plugin.supplyAsync(() -> {
+            Optional<Location> location = generateSafeLocation(world, params).join();
+            int attempts = 0;
+            while (location.isEmpty() || (location.isPresent() && !passesRegionChecks(location.get()))) {
+                if (location.isPresent()) {
+                    location = Optional.empty();
+                }
+                location = generateSafeLocation(world, params).join();
                 if (attempts >= maxAttempts) {
                     return Optional.empty();
                 }

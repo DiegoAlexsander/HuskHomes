@@ -29,7 +29,6 @@ import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.util.Pool;
 
-import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Level;
 
@@ -72,6 +71,7 @@ public class RedisBroker extends PluginMessageBroker {
     @NotNull
     private static Pool<Jedis> getJedisPool(@NotNull RedisSettings settings) {
         // Get the Redis connection settings
+        final String username = settings.getUsername();
         final String password = settings.getPassword();
         final String host = settings.getHost();
         final int port = settings.getPort();
@@ -85,32 +85,36 @@ public class RedisBroker extends PluginMessageBroker {
         config.setTestOnBorrow(true);
         config.setTestOnReturn(true);
 
+        // Build the client config with optional username and password
+        final DefaultJedisClientConfig clientConfig = DefaultJedisClientConfig.builder()
+                .user(username.isEmpty() ? null : username)
+                .password(password.isEmpty() ? null : password)
+                .database(database)
+                .ssl(useSSL)
+                .timeoutMillis(timeout)
+                .build();
+
         // Check if sentinels are to be used
         final RedisSettings.SentinelSettings sentinel = settings.getSentinel();
-        Set<String> redisSentinelNodes = new HashSet<>(sentinel.getNodes());
+        Set<HostAndPort> redisSentinelNodes = sentinel.getNodes().stream()
+                .map(HostAndPort::from)
+                .collect(java.util.stream.Collectors.toSet());
         if (!redisSentinelNodes.isEmpty()) {
             final String sentinelPassword = sentinel.getPassword();
+            final DefaultJedisClientConfig sentinelClientConfig = DefaultJedisClientConfig.builder()
+                    .password(sentinelPassword.isEmpty() ? null : sentinelPassword)
+                    .build();
             return new JedisSentinelPool(
                     sentinel.getMasterName(),
                     redisSentinelNodes,
                     config,
-                    timeout,
-                    password.isEmpty() ? null : password,
-                    sentinelPassword.isEmpty() ? null : sentinelPassword,
-                    database
+                    clientConfig,
+                    sentinelClientConfig
             );
         }
 
         // Otherwise, use the standard Jedis pool
-        return new JedisPool(
-                config,
-                host,
-                port,
-                timeout,
-                password.isEmpty() ? null : password,
-                database,
-                useSSL
-        );
+        return new JedisPool(config, new HostAndPort(host, port), clientConfig);
     }
 
     @Override

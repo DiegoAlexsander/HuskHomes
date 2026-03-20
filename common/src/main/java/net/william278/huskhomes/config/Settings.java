@@ -289,6 +289,8 @@ public final class Settings {
             private int port = 6379;
             @Comment("Only change this if you know what you are doing. The default value is 0.")
             private int database = 0;
+            @Comment("Username for your Redis server. Leave blank if you're not using a username.")
+            private String username = "";
             @Comment("Password for your Redis server. Leave blank if you're not using a password.")
             private String password = "";
             @Comment("Timeout for connecting to the Redis server (in milliseconds)")

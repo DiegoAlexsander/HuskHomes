@@ -26,31 +26,93 @@ import lombok.NoArgsConstructor;
 
 /**
  * Represents a named RTP location with custom center, radius, and distribution parameters.
+ * Supports both circular (CIRCLE) and rectangular (RECTANGLE) area shapes.
+ * <p>
+ * Shape-specific and optional fields use nullable boxed types so that configlib only writes
+ * them to YAML when they are explicitly set (e.g. CIRCLE locations won't show min_x/max_x fields).
  */
-@Getter
 @Configuration
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class RtpLocation {
 
-    private String server = "";
-    private String world = "world";
-    private double centerX = 0;
-    private double centerZ = 0;
-    private int minRadius = 500;
-    private int maxRadius = 5000;
-    private float distributionMean = 0;
-    private float distributionStandardDeviation = 0;
+    /**
+     * The shape of the RTP area.
+     * CIRCLE uses center_x/center_z + min_radius/max_radius (default behaviour).
+     * RECTANGLE uses min_x/max_x/min_z/max_z absolute coordinates.
+     */
+    public enum Shape {
+        CIRCLE,
+        RECTANGLE
+    }
 
+    @Getter private String server = "";
+    @Getter private String world = "world";
+
+    /** Shape of the RTP area. Defaults to CIRCLE for backwards compatibility. */
+    @Getter private Shape shape = Shape.CIRCLE;
+
+    // --- CIRCLE mode fields (null when not applicable) ---
+    private Double centerX;
+    private Double centerZ;
+    private Integer minRadius;
+    private Integer maxRadius;
+
+    // --- RECTANGLE mode fields (null when not applicable) ---
+    private Double minX;
+    private Double maxX;
+    private Double minZ;
+    private Double maxZ;
+
+    // --- Optional distribution overrides (null = use global config values) ---
+    private Float distributionMean;
+    private Float distributionStandardDeviation;
+
+    // Manual getters returning primitives with sensible defaults
+
+    public double getCenterX() { return centerX != null ? centerX : 0.0; }
+    public double getCenterZ() { return centerZ != null ? centerZ : 0.0; }
+    public int getMinRadius() { return minRadius != null ? minRadius : 500; }
+    public int getMaxRadius() { return maxRadius != null ? maxRadius : 5000; }
+
+    public double getMinX() { return minX != null ? minX : 0.0; }
+    public double getMaxX() { return maxX != null ? maxX : 0.0; }
+    public double getMinZ() { return minZ != null ? minZ : 0.0; }
+    public double getMaxZ() { return maxZ != null ? maxZ : 0.0; }
+
+    public float getDistributionMean() { return distributionMean != null ? distributionMean : 0f; }
+    public float getDistributionStandardDeviation() { return distributionStandardDeviation != null ? distributionStandardDeviation : 0f; }
+
+    /** Constructor for CIRCLE mode (backwards compatible). */
     public RtpLocation(String server, String world, double centerX, double centerZ,
                        int minRadius, int maxRadius, float distributionMean, float distributionStdDev) {
         this.server = server;
         this.world = world;
+        this.shape = Shape.CIRCLE;
         this.centerX = centerX;
         this.centerZ = centerZ;
         this.minRadius = minRadius;
         this.maxRadius = maxRadius;
-        this.distributionMean = distributionMean;
-        this.distributionStandardDeviation = distributionStdDev;
+        if (distributionMean > 0) this.distributionMean = distributionMean;
+        if (distributionStdDev > 0) this.distributionStandardDeviation = distributionStdDev;
+    }
+
+    /** Constructor for RECTANGLE mode. */
+    public RtpLocation(String server, String world,
+                       double minX, double maxX, double minZ, double maxZ,
+                       float distributionMean, float distributionStdDev) {
+        this.server = server;
+        this.world = world;
+        this.shape = Shape.RECTANGLE;
+        this.minX = minX;
+        this.maxX = maxX;
+        this.minZ = minZ;
+        this.maxZ = maxZ;
+        if (distributionMean > 0) this.distributionMean = distributionMean;
+        if (distributionStdDev > 0) this.distributionStandardDeviation = distributionStdDev;
+    }
+
+    public boolean isRectangle() {
+        return shape == Shape.RECTANGLE;
     }
 
 }

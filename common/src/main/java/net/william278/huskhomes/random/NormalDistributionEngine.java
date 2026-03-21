@@ -110,6 +110,7 @@ public final class NormalDistributionEngine extends RandomTeleportEngine {
 
     /**
      * Generate a safe ground-level {@link Location} using custom center and radius parameters from an RTP location.
+     * When the params specify a RECTANGLE shape, generates a uniformly-distributed position within the rectangle.
      *
      * @param world  The world to generate the location in
      * @param params The location parameters
@@ -117,6 +118,12 @@ public final class NormalDistributionEngine extends RandomTeleportEngine {
      */
     private CompletableFuture<Optional<Location>> generateSafeLocation(@NotNull World world,
                                                                        @NotNull Payload.RtpLocationParams params) {
+        if (params.isRectangle()) {
+            return plugin.findSafeGroundLocation(
+                    generateRectangularLocation(params.getMinX(), params.getMaxX(),
+                            params.getMinZ(), params.getMaxZ(), world)
+            );
+        }
         final float useMean = params.getDistributionMean() > 0 ? params.getDistributionMean() : mean;
         final float useStdDev = params.getDistributionStandardDeviation() > 0
                 ? params.getDistributionStandardDeviation() : standardDeviation;
@@ -124,6 +131,27 @@ public final class NormalDistributionEngine extends RandomTeleportEngine {
         return plugin.findSafeGroundLocation(generateLocation(
                 center, useMean, useStdDev, params.getMinRadius(), params.getMaxRadius()
         ));
+    }
+
+    /**
+     * Generate a {@link Location} with a uniformly-distributed random position inside the given rectangle.
+     * Used when an RTP location is configured with {@code shape: RECTANGLE}.
+     *
+     * @param minX  Minimum X coordinate (inclusive)
+     * @param maxX  Maximum X coordinate (inclusive)
+     * @param minZ  Minimum Z coordinate (inclusive)
+     * @param maxZ  Maximum Z coordinate (inclusive)
+     * @param world The world to generate the location in
+     * @return A generated location
+     */
+    @NotNull
+    public static Location generateRectangularLocation(double minX, double maxX,
+                                                       double minZ, double maxZ,
+                                                       @NotNull World world) {
+        final Random random = new Random();
+        final double x = minX + (random.nextDouble() * (maxX - minX));
+        final double z = minZ + (random.nextDouble() * (maxZ - minZ));
+        return Location.at(Math.round(x), 128d, Math.round(z), world);
     }
 
     /**

@@ -49,10 +49,25 @@ public interface BukkitHookProvider extends HookProvider {
 
         // Region check hooks for RTP
         if (isDependencyAvailable("Towny") && settings.getRtp().getRegionChecks().isTowny()) {
-            hooks.add(new TownyHook(getPlugin()));
+            try {
+                Class.forName("com.palmergames.bukkit.towny.TownyAPI");
+                hooks.add(new TownyHook(getPlugin()));
+            } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                getPlugin().log(java.util.logging.Level.WARNING,
+                        "Towny region check could not be enabled: " + e.getMessage()
+                        + ". Ensure Towny is in paper-plugin.yml with join-classpath: true.");
+            }
         }
         if (isDependencyAvailable("WorldGuard") && settings.getRtp().getRegionChecks().isWorldGuard()) {
-            hooks.add(new WorldGuardHook(getPlugin()));
+            try {
+                Class.forName("com.sk89q.worldguard.WorldGuard");
+                Class.forName("com.sk89q.worldedit.bukkit.BukkitAdapter");
+                hooks.add(new WorldGuardHook(getPlugin()));
+            } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                getPlugin().log(java.util.logging.Level.WARNING,
+                        "WorldGuard region check could not be enabled: " + e.getMessage()
+                        + ". Ensure WorldGuard and WorldEdit are in paper-plugin.yml with join-classpath: true.");
+            }
         }
 
         return hooks;

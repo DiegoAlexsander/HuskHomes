@@ -212,15 +212,22 @@ public class RtpCommand extends Command implements UserListTabCompletable {
             plugin.getLocales().getLocale("teleporting_random_location", locationName)
                     .ifPresent(teleporter::sendMessage);
 
-            plugin.getBroker().ifPresent(b -> Message.builder()
-                    .type(Message.MessageType.REQUEST_RTP_LOCATION)
-                    .target(locationServer, Message.TargetType.SERVER)
-                    .payload(Payload.rtpLocationRequest(
+            final Payload crossServerPayload = location.isRectangle()
+                    ? Payload.rtpRectangleRequest(
+                            location.getWorld(),
+                            location.getMinX(), location.getMaxX(),
+                            location.getMinZ(), location.getMaxZ(),
+                            useMean, useStdDev)
+                    : Payload.rtpLocationRequest(
                             location.getWorld(),
                             location.getCenterX(), location.getCenterZ(),
                             location.getMinRadius(), location.getMaxRadius(),
-                            useMean, useStdDev
-                    ))
+                            useMean, useStdDev);
+
+            plugin.getBroker().ifPresent(b -> Message.builder()
+                    .type(Message.MessageType.REQUEST_RTP_LOCATION)
+                    .target(locationServer, Message.TargetType.SERVER)
+                    .payload(crossServerPayload)
                     .build().send(b, teleporter));
             plugin.getPendingCrossServerRtp().add(teleporter.getUuid());
             final UUID pendingUuid = teleporter.getUuid();
@@ -248,12 +255,17 @@ public class RtpCommand extends Command implements UserListTabCompletable {
         plugin.getLocales().getLocale("teleporting_random_location", locationName)
                 .ifPresent(teleporter::sendMessage);
 
-        final Payload.RtpLocationParams params = new Payload.RtpLocationParams(
-                location.getWorld(),
-                location.getCenterX(), location.getCenterZ(),
-                location.getMinRadius(), location.getMaxRadius(),
-                useMean, useStdDev
-        );
+        final Payload.RtpLocationParams params = location.isRectangle()
+                ? Payload.RtpLocationParams.rectangle(
+                        location.getWorld(),
+                        location.getMinX(), location.getMaxX(),
+                        location.getMinZ(), location.getMaxZ(),
+                        useMean, useStdDev)
+                : new Payload.RtpLocationParams(
+                        location.getWorld(),
+                        location.getCenterX(), location.getCenterZ(),
+                        location.getMinRadius(), location.getMaxRadius(),
+                        useMean, useStdDev);
 
         plugin.getRandomTeleportEngine()
                 .getRandomPosition(localWorld.get(), params)

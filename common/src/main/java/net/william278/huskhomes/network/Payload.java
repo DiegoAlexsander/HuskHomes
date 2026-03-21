@@ -112,6 +112,16 @@ public class Payload {
         return payload;
     }
 
+    @NotNull
+    public static Payload rtpRectangleRequest(@NotNull String worldName,
+                                              double minX, double maxX, double minZ, double maxZ,
+                                              float mean, float stdDev) {
+        final Payload payload = new Payload();
+        payload.string = worldName;
+        payload.rtpLocationParams = RtpLocationParams.rectangle(worldName, minX, maxX, minZ, maxZ, mean, stdDev);
+        return payload;
+    }
+
     public Optional<String> getString() {
         return Optional.ofNullable(string);
     }
@@ -140,12 +150,24 @@ public class Payload {
      * Parameters for a named RTP location, sent cross-server so the target server
      * can generate a random position using the location's specific center, radius,
      * and distribution settings.
+     * Supports both CIRCLE (center_x/center_z + min_radius/max_radius) and
+     * RECTANGLE (min_x/max_x/min_z/max_z) shapes.
      */
     @Getter
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class RtpLocationParams {
         @Expose
         private String world;
+
+        /**
+         * Shape of the RTP area: "CIRCLE" (default) or "RECTANGLE".
+         * Null is treated as CIRCLE for backwards compatibility.
+         */
+        @Expose
+        @Nullable
+        private String shape;
+
+        // --- CIRCLE mode fields ---
         @Expose
         @SerializedName("center_x")
         private double centerX;
@@ -158,6 +180,21 @@ public class Payload {
         @Expose
         @SerializedName("max_radius")
         private int maxRadius;
+
+        // --- RECTANGLE mode fields ---
+        @Expose
+        @SerializedName("min_x")
+        private double minX;
+        @Expose
+        @SerializedName("max_x")
+        private double maxX;
+        @Expose
+        @SerializedName("min_z")
+        private double minZ;
+        @Expose
+        @SerializedName("max_z")
+        private double maxZ;
+
         @Expose
         @SerializedName("distribution_mean")
         private float distributionMean;
@@ -165,16 +202,39 @@ public class Payload {
         @SerializedName("distribution_standard_deviation")
         private float distributionStandardDeviation;
 
+        /** Constructor for CIRCLE mode (backwards compatible). */
         public RtpLocationParams(@NotNull String world, double centerX, double centerZ,
                                  int minRadius, int maxRadius, float distributionMean,
                                  float distributionStandardDeviation) {
             this.world = world;
+            this.shape = "CIRCLE";
             this.centerX = centerX;
             this.centerZ = centerZ;
             this.minRadius = minRadius;
             this.maxRadius = maxRadius;
             this.distributionMean = distributionMean;
             this.distributionStandardDeviation = distributionStandardDeviation;
+        }
+
+        /** Factory method for RECTANGLE mode. */
+        @NotNull
+        public static RtpLocationParams rectangle(@NotNull String world,
+                                                  double minX, double maxX, double minZ, double maxZ,
+                                                  float distributionMean, float distributionStandardDeviation) {
+            final RtpLocationParams p = new RtpLocationParams();
+            p.world = world;
+            p.shape = "RECTANGLE";
+            p.minX = minX;
+            p.maxX = maxX;
+            p.minZ = minZ;
+            p.maxZ = maxZ;
+            p.distributionMean = distributionMean;
+            p.distributionStandardDeviation = distributionStandardDeviation;
+            return p;
+        }
+
+        public boolean isRectangle() {
+            return "RECTANGLE".equalsIgnoreCase(shape);
         }
     }
 
